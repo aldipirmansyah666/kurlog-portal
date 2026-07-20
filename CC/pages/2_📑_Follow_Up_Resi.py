@@ -70,10 +70,11 @@ with st.sidebar:
             df_mapped['STATUS RESI'] = find_col(['STATUS RESI', 'STATUS_RESI', 'STATUS'], default_val="PERJALANAN")
             df_mapped['SELESAI'] = find_col(['SELESAI', 'FINISH'], default_val="BELUM")
             
-            # PENANDA TANGGAL FU KEMBALI & DETAIL
+            # PENANDA TANGGAL FU KEMBALI DI
+            # Mencegah TGL FU KEMBALI berubah otomatis dengan membaca tanggal tersimpan
             today_str = datetime.now().strftime('%d/%m/%Y')
-            df_mapped['TGL FU KEMBALI'] = find_col(['TGL FU', 'TANGGAL FU'], default_val=today_str)
-            df_mapped['DETAIL'] = find_col(['DETAIL', 'CATATAN', 'KET'], default_val="HOLD TANGGAL")
+            df_mapped['TGL FU KEMBALI'] = find_col(['TGL FU', 'TANGGAL FU', 'FU KEMBALI'], default_val=today_str)
+            df_mapped['DETAIL'] = find_col(['DETAIL', 'CATATAN', 'KET'], default_val="HOLD HINGGA TGL ...")
             df_mapped['FU SELANJUTNYA'] = find_col(['FU SELANJUTNYA', 'FU', 'TINDAK LANJUT'], default_val="SILAKAN DI FU ULANG")
             df_mapped['CCH'] = find_col(['CCH', 'STATUS CCH'], default_val="-")
 
@@ -133,7 +134,13 @@ if not df.empty:
     # 4. TABEL DATA FOLLOW UP INTERAKTIF
     # ---------------------------------------------------------
     st.subheader("📋 Tabel Pemantauan & Penandaan FU Resi")
-    st.caption("📅 *Kolom **TGL FU KEMBALI** digunakan untuk menandai tanggal terakhir resi di-follow up ulang.*")
+    st.info("""
+        📌 **Panduan Penandaan Status:**
+        * **Sukses Terkirim**: Ubah `SELESAI` -> **SUDAH**, `FU SELANJUTNYA` -> **DONE FU / SUKSES TERKIRIM**.
+        * **Hold Tanggal**: Ubah `FU SELANJUTNYA` -> **HOLD HINGGA TGL**, isi `DETAIL` -> **HOLD HINGGA TGL 25/07**.
+        * **Retur**: Ubah `STATUS RESI` -> **PROSES RETUR**, `FU SELANJUTNYA` -> **RETUR**.
+        * **TGL FU KEMBALI**: Nilai tanggal diam & tidak akan berubah otomatis setelah tersimpan.
+    """)
 
     edited_df = st.data_editor(
         df_filtered,
@@ -149,7 +156,7 @@ if not df.empty:
             ),
             "STATUS RESI": st.column_config.SelectboxColumn(
                 "Status Resi",
-                options=["PERJALANAN", "PENGANTARAN", "POTENSI KENDALA", "PROSES RETUR"],
+                options=["PERJALANAN", "PENGANTARAN", "POTENSI KENDALA", "PROSES RETUR", "SUKSES TERKIRIM"],
                 required=True
             ),
             "SELESAI": st.column_config.SelectboxColumn(
@@ -157,14 +164,15 @@ if not df.empty:
                 options=["BELUM", "SUDAH"],
                 required=True
             ),
-            "TGL FU KEMBALI": st.column_config.TextColumn("📅 Tgl FU Kembali"),
-            "DETAIL": st.column_config.TextColumn("Detail Catatan"),
+            "TGL FU KEMBALI": st.column_config.TextColumn("📅 Tgl FU Kembali (Tetap)"),
+            "DETAIL": st.column_config.TextColumn("Detail Catatan (misal: HOLD TGL 25/07)"),
             "FU SELANJUTNYA": st.column_config.SelectboxColumn(
                 "FU Selanjutnya",
                 options=[
                     "SILAKAN DI FU ULANG",
                     "DONE FU",
                     "DONE FU 13",
+                    "SUKSES TERKIRIM",
                     "HOLD HINGGA TGL",
                     "SUDAH DI CCH",
                     "CCH ULANG",
@@ -190,7 +198,7 @@ if not df.empty:
     with c_btn1:
         if st.button("💾 Simpan Perubahan Tabel", use_container_width=True, type="primary"):
             st.session_state.df_followup = edited_df
-            st.success("✅ Perubahan berhasil disimpan ke memory!")
+            st.success("✅ Semua perubahan status & tanggal berhasil dikunci!")
             st.rerun()
 
     with c_btn2:

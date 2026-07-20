@@ -90,11 +90,12 @@ Berikut informasi resinya :
             
             encoded_message = urllib.parse.quote(pesan_template)
             
+            # MENGGUNAKAN PROTOKOL DIRECT whatsapp:// TERBARU
             if formatted_phone:
-                wa_url = f"https://web.whatsapp.com/send?phone={formatted_phone}&text={encoded_message}"
+                wa_url = f"whatsapp://send?phone={formatted_phone}&text={encoded_message}"
                 status_wa = f"🟢 **No. WA:** `{raw_phone}`"
             else:
-                wa_url = f"https://web.whatsapp.com/send?text={encoded_message}"
+                wa_url = f"whatsapp://send?text={encoded_message}"
                 status_wa = "⚠️ *Nomor belum terdaftar di menu 'Kontak Agen'*"
             
             with st.expander(f"🏢 **{agen}** — ({len(agen_data)} Paket Belum Dibagging)", expanded=True):
@@ -107,7 +108,7 @@ Berikut informasi resinya :
                 with col_btn:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.markdown(f"""
-                        <a href="{wa_url}" target="_blank" style="text-decoration: none;">
+                        <a href="{wa_url}" style="text-decoration: none;">
                             <div style="
                                 background-color: #25D366;
                                 color: white !important;
@@ -132,6 +133,11 @@ Berikut informasi resinya :
 
 else:
     st.info("💡 **Petunjuk**: Silakan *drag & drop* atau klik tombol di atas untuk mengunggah file Excel KurLog Anda.")
+
+# Sidebar & Footer
+st.sidebar.markdown("---")
+st.sidebar.markdown("🏢 **POSIX Helpdesk System**")
+st.sidebar.markdown("💻 Developed by **Aldi**")
 
 st.markdown("---")
 st.caption("KurLog Operations Portal • Developed with 💻 by **Aldi**")

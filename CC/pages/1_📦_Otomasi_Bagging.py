@@ -90,12 +90,12 @@ Berikut informasi resinya :
             
             encoded_message = urllib.parse.quote(pesan_template)
             
-            # MENGGUNAKAN PROTOKOL DIRECT whatsapp:// TERBARU
+            # MENGGUNAKAN LINK WEB WHATSAPP RESMI (Browser Only)
             if formatted_phone:
-                wa_url = f"whatsapp://send?phone={formatted_phone}&text={encoded_message}"
+                wa_url = f"https://web.whatsapp.com/send?phone={formatted_phone}&text={encoded_message}"
                 status_wa = f"🟢 **No. WA:** `{raw_phone}`"
             else:
-                wa_url = f"whatsapp://send?text={encoded_message}"
+                wa_url = f"https://web.whatsapp.com/send?text={encoded_message}"
                 status_wa = "⚠️ *Nomor belum terdaftar di menu 'Kontak Agen'*"
             
             with st.expander(f"🏢 **{agen}** — ({len(agen_data)} Paket Belum Dibagging)", expanded=True):
@@ -108,7 +108,7 @@ Berikut informasi resinya :
                 with col_btn:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.markdown(f"""
-                        <a href="{wa_url}" style="text-decoration: none;">
+                        <a href="{wa_url}" target="_blank" style="text-decoration: none;">
                             <div style="
                                 background-color: #25D366;
                                 color: white !important;

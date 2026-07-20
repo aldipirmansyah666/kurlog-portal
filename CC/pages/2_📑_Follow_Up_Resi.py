@@ -24,7 +24,9 @@ DATA_STORAGE_PATH = "CC/data_followup_saved.json"
 def save_data_permanently(df):
     try:
         os.makedirs(os.path.dirname(DATA_STORAGE_PATH), exist_ok=True)
-        df.to_json(DATA_STORAGE_PATH, orient="records", date_format="iso")
+        # Hapus baris yang sepenuhnya kosong jika ada dari hasil copas
+        df_clean = df.dropna(how="all").copy()
+        df_clean.to_json(DATA_STORAGE_PATH, orient="records", date_format="iso")
         return True
     except Exception as e:
         st.error(f"Gagal menyimpan data ke penyimpanan permanen: {e}")
@@ -44,14 +46,47 @@ if "df_followup" not in st.session_state or st.session_state.df_followup.empty:
     st.session_state.df_followup = load_permanent_data()
 
 # ---------------------------------------------------------
-# 2. SIDEBAR - UPLOAD & SUMBER DATA
+# 2. CALLBACK UNTUK AUTO-SAVE SAAT EDIT / COPAS
+# ---------------------------------------------------------
+def auto_save_callback():
+    # Ambil perubahan terbaru dari widget data_editor
+    if "data_editor_fu_v3" in st.session_state:
+        editor_state = st.session_state["data_editor_fu_v3"]
+        
+        # Ambil dataframe saat ini
+        current_df = st.session_state.df_followup.copy()
+        
+        # 1. Terapkan perubahan editan sel (Edited Rows)
+        for row_idx_str, changes in editor_state.get("edited_rows", {}).items():
+            row_idx = int(row_idx_str)
+            if row_idx < len(current_df):
+                for col_name, new_val in changes.items():
+                    current_df.at[row_idx, col_name] = new_val
+                    
+        # 2. Terapkan penambahan baris / copas (Added Rows)
+        added_rows = editor_state.get("added_rows", [])
+        if added_rows:
+            new_rows_df = pd.DataFrame(added_rows)
+            current_df = pd.concat([current_df, new_rows_df], ignore_index=True)
+            
+        # 3. Terapkan penghapusan baris (Deleted Rows)
+        deleted_indices = editor_state.get("deleted_rows", [])
+        if deleted_indices:
+            current_df = current_df.drop(index=deleted_indices).reset_index(drop=True)
+            
+        # Simpan hasil perubahan ke session state dan file json permanen
+        st.session_state.df_followup = current_df
+        save_data_permanently(current_df)
+
+# ---------------------------------------------------------
+# 3. SIDEBAR - UPLOAD & SUMBER DATA
 # ---------------------------------------------------------
 with st.sidebar:
     st.header("📂 Sumber Data")
     
-    # Status Penyimpanan
+    # Indikator Auto-Save
     if not st.session_state.df_followup.empty:
-        st.success("🟢 **Data Tersimpan di Sistem**")
+        st.success("🟢 **Auto-Save Aktif (Tersimpan Permanen)**")
     else:
         st.info("⚪ *Belum ada data tersimpan*")
 
@@ -113,6 +148,7 @@ with st.sidebar:
             st.session_state.df_followup = df_mapped
             save_data_permanently(df_mapped)
             st.success(f"✅ Sheet **{sheet_selected}** ({len(df_mapped)} Resi) Berhasil Diimpor & Disimpan!")
+            st.rerun()
             
         except Exception as e:
             st.error(f"Gagal membaca file: {e}")
@@ -126,12 +162,11 @@ with st.sidebar:
             st.rerun()
 
 # ---------------------------------------------------------
-# 3. METRIK & PENGENALAN CCH OTOMATIS
+# 4. METRIK & PENGENALAN CCH OTOMATIS
 # ---------------------------------------------------------
 df = st.session_state.df_followup
 
 if not df.empty:
-    # PERHITUNGAN METRIK OPTIMAL (DETEKSI CCH & RETUR CERDAS)
     total_tiket = len(df)
     
     # Deteksi CCH jika ada kata 'CCH' di kolom CCH, FU SELANJUTNYA, atau DETAIL
@@ -169,7 +204,7 @@ if not df.empty:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 4. FILTERING SYSTEM
+    # 5. FILTERING SYSTEM
     # ---------------------------------------------------------
     c_search, c_filter_status, c_filter_cch, c_filter_petugas = st.columns([2, 1, 1, 1])
     
@@ -203,10 +238,10 @@ if not df.empty:
     st.markdown("---")
 
     # ---------------------------------------------------------
-    # 5. TABEL DATA INTERAKTIF & EDITABLE
+    # 6. TABEL DATA INTERAKTIF & AUTO-SAVE ON CHANGE (COPAS)
     # ---------------------------------------------------------
     st.subheader("📋 Tabel Pemantauan & Penandaan FU Resi")
-    st.caption("💡 *Setiap editan di tabel di bawah akan tersimpan permanen saat Anda menekan tombol **'💾 Simpan Perubahan'**.*")
+    st.caption("⚡ *Sistem ini menggunakan **Auto-Save**. Hasil Copy-Paste (Ctrl+V) dan editan sel akan tersimpan otomatis secara permanen.*")
 
     edited_df = st.data_editor(
         df_filtered,
@@ -257,37 +292,28 @@ if not df.empty:
         use_container_width=True,
         hide_index=True,
         num_rows="dynamic",
-        key="data_editor_fu_v2"
+        key="data_editor_fu_v3",
+        on_change=auto_save_callback  # MENTRIGGER AUTO SAVE SAAT TERJADI COPAS / EDIT
     )
 
     # ---------------------------------------------------------
-    # 6. SIMPAN PERMANEN & DOWNLOAD EXCEL
+    # 7. EKSPOR EXCEL
     # ---------------------------------------------------------
     st.markdown("<br>", unsafe_allow_html=True)
-    c_btn1, c_btn2 = st.columns([1, 2])
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        st.session_state.df_followup.to_excel(writer, index=False, sheet_name="DATA FOLLOW UP")
     
-    with c_btn1:
-        if st.button("💾 Simpan Perubahan (Permanen)", use_container_width=True, type="primary"):
-            st.session_state.df_followup = edited_df
-            save_data_permanently(edited_df)
-            st.success("✅ Perubahan tersimpan secara permanen! Data tidak akan hilang saat di-refresh.")
-            st.rerun()
-
-    with c_btn2:
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            st.session_state.df_followup.to_excel(writer, index=False, sheet_name="DATA FOLLOW UP")
-        
-        st.download_button(
-            label="📥 Download Hasil Follow Up Terbaru (.xlsx)",
-            data=buffer.getvalue(),
-            file_name=f"DATA_FOLLOW_UP_RESI_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+    st.download_button(
+        label="📥 Download Hasil Follow Up Terbaru (.xlsx)",
+        data=buffer.getvalue(),
+        file_name=f"DATA_FOLLOW_UP_RESI_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 
 else:
-    st.info("💡 **Petunjuk**: Silakan unggah file Excel Google Sheets Anda melalui **Sidebar di sebelah kiri** untuk memulai pengolahan data.")
+    st.info("💡 **Petunjuk**: Silakan unggah file Excel Google Sheets Anda melalui **Sidebar di sebelah kiri** atau salin-tempel (Ctrl+V) data langsung ke tabel.")
 
 # Sidebar & Footer
 st.sidebar.markdown("---")

@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import urllib.parse
+import json
+import os
+import re
 
 st.set_page_config(
     page_title="Otomasi Bagging - KurLog", 
@@ -8,58 +11,34 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom Styling
-st.markdown("""
-    <style>
-    .stApp { background-color: #f8fafc !important; }
-    
-    .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp span, .stApp label {
-        color: #0f172a !important;
-    }
-
-    .stCaption { color: #475569 !important; }
-
-    div[data-testid="stMetric"] {
-        background-color: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    div[data-testid="stMetric"] * { color: #0f172a !important; }
-
-    /* Watermark / Footer Style */
-    .dev-footer {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        background-color: #ffffff;
-        color: #64748b;
-        text-align: center;
-        padding: 8px;
-        font-size: 0.85rem;
-        border-top: 1px solid #e2e8f0;
-        z-index: 100;
-    }
-    .dev-badge {
-        background-color: #e0e7ff;
-        color: #3730a3;
-        padding: 2px 8px;
-        border-radius: 6px;
-        font-weight: 600;
-    }
-
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    </style>
-""", unsafe_allow_html=True)
-
 st.title("📦 Otomasi Pengingat Bagging Resi")
 st.caption("Unggah file Excel KurLog untuk memproses data dan menghasilkan template pesan pengingat WhatsApp.")
 st.markdown("---")
 
-# Section Upload
+# --- MEMBACA DATABASE KONTAK AGEN DARI JSON ---
+DB_PATH = "CC/database_agen.json"
+
+def get_kontak_database():
+    if os.path.exists(DB_PATH):
+        try:
+            with open(DB_PATH, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+KONTAK_AGEN = get_kontak_database()
+
+def format_no_wa(no_hp):
+    """Mengubah format 08xx menjadi 628xx untuk link WhatsApp"""
+    if not no_hp or pd.isna(no_hp):
+        return ""
+    clean_num = re.sub(r'\D', '', str(no_hp))
+    if clean_num.startswith("0"):
+        clean_num = "62" + clean_num[1:]
+    return clean_num
+
+# --- SECTION UPLOAD FILE ---
 uploaded_files = st.file_uploader(
     "Unggah File KurLog (.xlsx) — Bisa pilih beberapa file sekaligus", 
     type=["xlsx"], 
@@ -99,21 +78,30 @@ if uploaded_files:
             sample_date = pd.to_datetime(agen_data['Tanggal'].iloc[0]).strftime('%d/%m/%Y')
             resi_list_str = "\n".join(agen_data['No Resi'].astype(str).tolist())
             
+            # Match nama agen dengan database (case-insensitive)
+            raw_phone = KONTAK_AGEN.get(str(agen).strip().upper(), "")
+            formatted_phone = format_no_wa(raw_phone)
+            
             pesan_template = f"""Selamat pagi pak, mohon maaf mengganggu waktunya pak, kami sampaikan ada paket di agen bapak {agen} pada Tanggal {sample_date} yang belum dibagging ya pak?
 Mohon dibantu untuk segera dibagging.
 
 Berikut informasi resinya :
 {resi_list_str}"""
             
-            # Encoded pesan untuk URL WhatsApp Web Direct
             encoded_message = urllib.parse.quote(pesan_template)
-            wa_url = f"https://web.whatsapp.com/send?text={encoded_message}"
+            
+            if formatted_phone:
+                wa_url = f"https://web.whatsapp.com/send?phone={formatted_phone}&text={encoded_message}"
+                status_wa = f"🟢 **No. WA:** `{raw_phone}`"
+            else:
+                wa_url = f"https://web.whatsapp.com/send?text={encoded_message}"
+                status_wa = "⚠️ *Nomor belum terdaftar di menu 'Kontak Agen'*"
             
             with st.expander(f"🏢 **{agen}** — ({len(agen_data)} Paket Belum Dibagging)", expanded=True):
                 col_txt, col_btn = st.columns([3, 1])
                 
                 with col_txt:
-                    st.caption("👇 *Klik icon salin di pojok kanan atas kotak di bawah untuk menyalin teks:*")
+                    st.caption(f"{status_wa} | 👇 *Klik icon salin di pojok kanan atas:*")
                     st.code(pesan_template, language=None)
                 
                 with col_btn:
@@ -123,14 +111,14 @@ Berikut informasi resinya :
                             <div style="
                                 background-color: #25D366;
                                 color: white !important;
-                                padding: 0.6rem 1rem;
+                                padding: 0.7rem 1rem;
                                 border-radius: 8px;
                                 text-align: center;
                                 font-weight: 600;
                                 margin-bottom: 10px;
                                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                             ">
-                                💬 Buka di WA Web
+                                💬 Kirim ke WA Agen
                             </div>
                         </a>
                     """, unsafe_allow_html=True)
@@ -145,10 +133,5 @@ Berikut informasi resinya :
 else:
     st.info("💡 **Petunjuk**: Silakan *drag & drop* atau klik tombol di atas untuk mengunggah file Excel KurLog Anda.")
 
-
-# Floating Footer Watermark
-st.markdown("""
-    <div class="dev-footer">
-        KurLog Operations Portal • Developed with by <b>Aldi</b>
-    </div>
-""", unsafe_allow_html=True)
+st.markdown("---")
+st.caption("KurLog Operations Portal • Developed with 💻 by **Aldi**")

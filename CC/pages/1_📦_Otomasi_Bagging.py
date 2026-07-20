@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
 import urllib.parse
-import json
-import os
-import re
 
 st.set_page_config(
     page_title="Otomasi Bagging - KurLog", 
@@ -14,29 +11,6 @@ st.set_page_config(
 st.title("📦 Otomasi Pengingat Bagging Resi")
 st.caption("Unggah file Excel KurLog untuk memproses data dan menghasilkan template pesan pengingat WhatsApp.")
 st.markdown("---")
-
-# --- MEMBACA DATABASE KONTAK AGEN DARI JSON ---
-DB_PATH = "CC/database_agen.json"
-
-def get_kontak_database():
-    if os.path.exists(DB_PATH):
-        try:
-            with open(DB_PATH, "r") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-KONTAK_AGEN = get_kontak_database()
-
-def format_no_wa(no_hp):
-    """Mengubah format 08xx menjadi 628xx untuk link WhatsApp"""
-    if not no_hp or pd.isna(no_hp):
-        return ""
-    clean_num = re.sub(r'\D', '', str(no_hp))
-    if clean_num.startswith("0"):
-        clean_num = "62" + clean_num[1:]
-    return clean_num
 
 # --- SECTION UPLOAD FILE ---
 uploaded_files = st.file_uploader(
@@ -78,10 +52,6 @@ if uploaded_files:
             sample_date = pd.to_datetime(agen_data['Tanggal'].iloc[0]).strftime('%d/%m/%Y')
             resi_list_str = "\n".join(agen_data['No Resi'].astype(str).tolist())
             
-            # Match nama agen dengan database (case-insensitive)
-            raw_phone = KONTAK_AGEN.get(str(agen).strip().upper(), "")
-            formatted_phone = format_no_wa(raw_phone)
-            
             pesan_template = f"""Selamat pagi pak, mohon maaf mengganggu waktunya pak, kami sampaikan ada paket di agen bapak {agen} pada Tanggal {sample_date} yang belum dibagging ya pak?
 Mohon dibantu untuk segera dibagging.
 
@@ -89,20 +59,13 @@ Berikut informasi resinya :
 {resi_list_str}"""
             
             encoded_message = urllib.parse.quote(pesan_template)
-            
-            # MENGGUNAKAN LINK WEB WHATSAPP RESMI (Browser Only)
-            if formatted_phone:
-                wa_url = f"https://web.whatsapp.com/send?phone={formatted_phone}&text={encoded_message}"
-                status_wa = f"🟢 **No. WA:** `{raw_phone}`"
-            else:
-                wa_url = f"https://web.whatsapp.com/send?text={encoded_message}"
-                status_wa = "⚠️ *Nomor belum terdaftar di menu 'Kontak Agen'*"
+            wa_url = f"https://web.whatsapp.com/send?text={encoded_message}"
             
             with st.expander(f"🏢 **{agen}** — ({len(agen_data)} Paket Belum Dibagging)", expanded=True):
                 col_txt, col_btn = st.columns([3, 1])
                 
                 with col_txt:
-                    st.caption(f"{status_wa} | 👇 *Klik icon salin di pojok kanan atas:*")
+                    st.caption("👇 *Klik ikon copy (salin) di pojok kanan atas kotak ini untuk menyalin pesan:*")
                     st.code(pesan_template, language=None)
                 
                 with col_btn:
@@ -119,7 +82,7 @@ Berikut informasi resinya :
                                 margin-bottom: 10px;
                                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                             ">
-                                💬 Kirim ke WA Agen
+                                💬 Buka Draft di WA Web
                             </div>
                         </a>
                     """, unsafe_allow_html=True)

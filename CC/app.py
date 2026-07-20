@@ -42,7 +42,6 @@ st.info("### 📦 Otomasi Bagging Notifier\n"
 
 # Sidebar & Footer
 st.sidebar.markdown("---")
-st.sidebar.markdown("🏢 **POSIX Helpdesk System**")
 st.sidebar.markdown("💻 Developed by **Aldi**")
 
 st.markdown("---")
